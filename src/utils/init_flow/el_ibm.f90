@@ -479,6 +479,27 @@ subroutine el_ibm_particles
               exit part2
            end if
         end do part2
+
+        ! Prevent inter-particle overlap
+        if (success) then
+            part3: do j=1, i-1
+               distance=0.0_WP
+               ! Compute separation distance 
+               do k = 1, nDimensions
+                  distance(k) = abs(particles(i)%position(k) - particles(j)%position(k))
+                  if (isPeriodic(k)) then
+                     distance(k) = min(distance(k), periodicLength(k) -                       &
+                        abs(particles(i)%position(k) - particles(j)%position(k)))
+                  end if
+               end do
+               r = sqrt(sum(distance**2))
+               if (r.le.0.55_WP*2.0_WP*dp) then
+                  i=i-1
+                  success = .false.
+                  exit part3
+               end if
+            end do part3
+        end if        
         i=i+1
 
         if (success .and. modulo(i,1000).eq.0)                                               &

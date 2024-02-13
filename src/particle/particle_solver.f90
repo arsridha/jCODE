@@ -170,7 +170,7 @@ subroutine particle_solver_setup
 
   ! Collisions
   call parser_read('particle collisions', collisionsOn, .false.)
-  interParticleCollisions = .false.
+  !interParticleCollisions = .false.
   if (collisionsOn) then
      ! Get the collision parameters
      call parser_read('inter-particle collisions', interParticleCollisions, .true.)
