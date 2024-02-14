@@ -32,6 +32,7 @@ subroutine monitor_cases_setup(mode, controlIteration)
   call monitor_homogeneous_setup
   call monitor_shock_tube_setup
   call monitor_drag_setup
+  call monitor_el_ibm_setup
 
   return
 end subroutine monitor_cases_setup
@@ -58,6 +59,7 @@ subroutine monitor_cases_timestep(controlIteration)
   call monitor_homogeneous_timestep
   call monitor_shock_tube_timestep
   call monitor_drag_timestep
+  call monitor_el_ibm_timestep
 
   return
 end subroutine monitor_cases_timestep

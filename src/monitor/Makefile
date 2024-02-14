@@ -4,7 +4,7 @@ F90FILES = monitor.f90 timing.f90 monitor_state.f90 monitor_particles.f90       
 	monitor_cases.f90 monitor_shear.f90 monitor_rayleigh_taylor.f90                      \
 	monitor_impulse.f90 monitor_time_info.f90 monitor_adjoint.f90                        \
 	monitor_homogeneous.f90 monitor_shock_tube.f90 monitor_drag.f90                      \
-	monitor_ibm.f90 #monitor_el_ibm.f90
+	monitor_ibm.f90 monitor_el_ibm.f90
 LIBFILE = libmonitor.a
 
 OFILES = $(F90FILES:.f90=.o)

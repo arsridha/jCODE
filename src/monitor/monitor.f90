@@ -654,6 +654,7 @@ subroutine monitor_setup_new_run(mode, controlIteration)
   if (nSpecies.gt.0 .and. nReactions.gt.0) call timing_create('combustion')
   if (useParticles) call timing_create('particles')
   if (useIBM) call timing_create('ibm')
+  if (useIBM .and. useParticles) call timing_create('el_ibm')
   if (.not. predictionOnly) then
      call timing_create('functional')
      call timing_create('controller')
