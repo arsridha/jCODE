@@ -392,7 +392,7 @@ end subroutine compute_ibm_collisions
 ! Compute collision force between Lagrangian particles and IBM !
 ! ============================================================ !
 subroutine compute_ibm_particle_collisions(useFriction, colTime, coefRest, mu, gridIndex,    &
-     delta, pos1, vel1, omega1, d1, mass1, n12, force, torque, ncol)
+     delta, pos1, vel1, omega1, d1, mass1, n12, force, torque, ncol, ncolpartibm)
 
   ! Internal modules
   use ibm_solver
@@ -413,7 +413,7 @@ subroutine compute_ibm_particle_collisions(useFriction, colTime, coefRest, mu, g
   real(WP), intent(in) :: colTime, coefRest, mu, delta, d1, mass1
   real(WP), dimension(3), intent(in) :: pos1, vel1, omega1, n12
   real(WP), dimension(3), intent(inout) :: force, torque
-  integer, intent(inout) :: ncol
+  integer, intent(inout) :: ncol, ncolpartibm
 
   ! Local variables
   integer :: jp
@@ -474,7 +474,8 @@ subroutine compute_ibm_particle_collisions(useFriction, colTime, coefRest, mu, g
   
   ! Update collision counter
   ncol=ncol+1
-
+  ncolpartibm = ncolpartibm + 1
+  
   return
 end subroutine compute_ibm_particle_collisions
 

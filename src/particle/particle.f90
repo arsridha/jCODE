@@ -37,7 +37,7 @@ module particle
      real(WP) :: addedMass
   end type t_MonitorParticle
   type(t_MonitorParticle) :: monitorParticle(3)
-  integer :: nParticleCollisions
+  integer :: nParticleCollisions, nParticleParticleCollisions, nParticleIBMCollisions
 
 contains
 

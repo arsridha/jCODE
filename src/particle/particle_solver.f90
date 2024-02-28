@@ -275,6 +275,8 @@ subroutine compute_particle_collisions
 
   ! Reset particle collision counter
   nParticleCollisions = 0
+  nParticleParticleCollisions=0
+  nParticleIBMCollisions=0
 
   if (.not. collisionsOn) return
 
@@ -501,7 +503,7 @@ subroutine compute_particle_collisions
            call compute_ibm_particle_collisions(useFriction, collisionTime,                  &
                 coefficientOfRestitution, coefficientOfFriction, particles(ip)%gridIndex,    &
                 delta, pos1, vel1, omega1, d1, mass1, n12, particles(ip)%collision,          &
-                particles(ip)%torque, nParticleCollisions)
+                particles(ip)%torque, nParticleCollisions,nParticleIBMCollisions)
         end if
      end if
      
@@ -606,6 +608,7 @@ subroutine compute_particle_collisions
                                d1 * n12(2) * tangentialCollision(1))
                           ! Update collision counter
                           nParticleCollisions = nParticleCollisions + 1
+                          nParticleParticleCollisions = nParticleParticleCollisions + 1
                        end if
                     end if
 
@@ -620,6 +623,8 @@ subroutine compute_particle_collisions
 
   ! Add up particle collision counter
   call parallel_sum(nParticleCollisions)
+  call parallel_sum(nParticleParticleCollisions)
+  call parallel_sum(nParticleIBMCollisions)
 
   return
 end subroutine compute_particle_collisions

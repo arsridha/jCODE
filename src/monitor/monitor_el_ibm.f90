@@ -42,7 +42,7 @@ subroutine monitor_el_ibm_setup
    call parser_read('particle threshold', threshold, 0.1_WP)
 
    ! Set the monitor names
-   call monitor_create('el_ibm', 11)
+   call monitor_create('el_ibm', 13)
    call monitor_set_header(1, 'N_ibm', 'r')
    call monitor_set_header(2, 'N_lpt', 'r')
    call monitor_set_header(3, 'xp_ibm_1%', 'r')
@@ -54,7 +54,9 @@ subroutine monitor_el_ibm_setup
    call monitor_set_header(9, '<x>_ibm','r')
    call monitor_set_header(10, '<x>_lpt','r')
    call monitor_set_header(11, 's','r')
-     
+   call monitor_set_header(12,'ncol_partpart','r')
+   call monitor_set_header(13,'ncol_partibm','r')
+
    return
 end subroutine monitor_el_ibm_setup
   
@@ -213,6 +215,8 @@ subroutine monitor_el_ibm_timestep
    call monitor_set_single_value(9, meanX_ibm)
    call monitor_set_single_value(10, meanX_part)
    call monitor_set_single_value(11, seg)
+   call monitor_set_single_value(12, real(nParticleParticleCollisions,WP))
+   call monitor_set_single_value(13, real(nParticleIBMCollisions,WP))
 
    return
   end subroutine monitor_el_ibm_timestep
