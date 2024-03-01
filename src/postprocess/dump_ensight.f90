@@ -349,6 +349,10 @@ contains
              str='scalar per node: 1 GRANULAR_TEMP GRANULAR_TEMP/GRANULAR_TEMP.******'
              write(iunit,'(a80)') str
           end if
+          if (useCollisionFrequency) then
+            str='scalar per node: 1 COLLISION_FREQ COLLISION_FREQ/COLLISION_FREQ.******'
+            write(iunit,'(a80)') str
+         end if
        end if
 
        if (dumpParticleToPatch(j)) then
@@ -1844,6 +1848,12 @@ subroutine dump_ensight_data(mode)
            name = 'GRANULAR_TEMP'
            call dump_ensight_scalar(name, granularTemperature(:,1))
         end if
+
+        ! Collision frequency
+        if (useCollisionFrequency) then
+           name='COLLISION_FREQ'
+           call dump_ensight_scalar(name,collisionFrequency(:,1))
+        end if 
      end if
 
      ! Jacobian

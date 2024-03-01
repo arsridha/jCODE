@@ -83,7 +83,7 @@ subroutine particle_solver_setup
   if (twoWayCoupling .and. filterSize .gt. 0.0_WP) then
      diffusionAmount = max(filterSize**2-minGridSpacing**2, 0.0_WP) / (16.0_WP * log(2.0_WP))
      !diffusionAmount = filterSize**2 / (16.0_WP * log(2.0_WP))
-     
+
      ! Decide if fluid variables should be filtered prior to interpolation
      call parser_read('filter fluid', filterFluid, .false.)
   else
@@ -99,6 +99,7 @@ subroutine particle_solver_setup
 
   ! Include granular temperature
   call parser_read('use granular temperature', useGranularTemperature, .false.)
+  call parser_read('use collision frequency', useCollisionFrequency, .false.)
 
   ! Get the drag model
   call parser_read('drag model', val, 'stokes')
@@ -135,8 +136,8 @@ subroutine particle_solver_setup
   case ('osnes', 'Osnes')
 
      dragModel = OSNES
-     
-     
+
+
   case ('basset', 'Basset')
 
      dragModel = BASSET
@@ -144,7 +145,7 @@ subroutine particle_solver_setup
   case ('parmar', 'Parmar')
 
      dragModel = PARMAR
-     
+
   case ('singh', 'SINGH')
 
      dragModel = SINGH
@@ -254,6 +255,7 @@ subroutine compute_particle_collisions
 
   ! Internal modules
   use particle_solver
+  use particle_exchange
 
   ! External modules
   use parallel
@@ -268,8 +270,8 @@ subroutine compute_particle_collisions
   integer(WP) :: id1, id2
   real(WP), parameter :: oneSixth = 1.0_WP / 6.0_WP
   real(WP), parameter :: clipCol = 0.2_WP
-  real(WP) :: d1, d2, mass1, mass2, particleSeparation, radiusOfInfluence, delta, rnv,       &
-       effectiveMass, springForce, damper, rtv, buf
+  real(WP) :: d1, d2, mass1, mass2, volume1, volume2, particleSeparation, radiusOfInfluence, &
+       delta, rnv, effectiveMass, springForce, damper, rtv, buf
   real(WP), dimension(3) :: pos1, pos2, vel1, vel2, n12, v12, v12n, normalCollision,         &
        omega1, omega2, t12, tangentialCollision
 
@@ -344,6 +346,7 @@ subroutine compute_particle_collisions
      omega1 = particles(ip)%angularVelocity
      d1     = particles(ip)%diameter
      mass1  = oneSixth * particleDensity * pi * d1**3
+     volume1 = oneSixth * pi * d1**3
 
      ! Particle-wall collisions
      ! ------------------------
@@ -506,7 +509,7 @@ subroutine compute_particle_collisions
                 particles(ip)%torque, nParticleCollisions,nParticleIBMCollisions)
         end if
      end if
-     
+
      ! Particle-particle collisions
      ! ----------------------------
      if (interParticleCollisions) then
@@ -543,6 +546,7 @@ subroutine compute_particle_collisions
                        omega2 = particles(jp)%angularVelocity
                        d2     = particles(jp)%diameter
                        mass2  = oneSixth * particleDensity * pi * d2**3
+                       volume2 = oneSixth * pi * d2**3
                     else
                        ! Get data from ghost particles
                        jp     = -jp
@@ -552,6 +556,7 @@ subroutine compute_particle_collisions
                        omega2 = ghostParticles(jp)%angularVelocity
                        d2     = ghostParticles(jp)%diameter
                        mass2  = oneSixth * particleDensity * pi * d2**3
+                       volume2 = oneSixth * pi * d2**3
                     end if
 
                     ! Distance between particles `1` and `2`
@@ -609,17 +614,42 @@ subroutine compute_particle_collisions
                           ! Update collision counter
                           nParticleCollisions = nParticleCollisions + 1
                           nParticleParticleCollisions = nParticleParticleCollisions + 1
+                          if (useCollisionFrequency) then
+                             call extrapolate_particle_to_grid(particles(ip)%gridIndex,      &
+                                  particles(ip)%position, volume1/timeStepSize,              &
+                                  cartScalar(:,:,:,1))
+                          end if
                        end if
                     end if
-
                  end do
-
               end do
            end do
         end do
      end if
-
   end do
+
+  if (useCollisionFrequency) then
+     ! Communicate at the borders
+     do i = 1, nDimensions
+        call border_summation(cartScalar, i, (/nOverlap(i,1), nOverlap(i,2) /))
+     end do
+
+     ! Send back granular temperature and normalize
+     do k = iStart(3), iEnd(3)
+        do j = iStart(2), iEnd(2)
+           do i =  iStart(1), iEnd(1)
+              gridIndex = i - gridOffset(1) + localGridSize(1) *                              &
+                   (j - 1 - gridOffset(2) + localGridSize(2) *                                &
+                   (k - 1 - gridOffset(3)))
+              collisionFrequency(gridIndex, 1) = cartScalar(i,j,k,1) * jacobian(gridIndex, 1)
+           end do
+        end do
+     end do
+
+     ! Filter
+     call filter_extrapolated_field(collisionFrequency(:,1:1))
+
+  end if
 
   ! Add up particle collision counter
   call parallel_sum(nParticleCollisions)
@@ -642,7 +672,7 @@ subroutine particle_rhs(part, dxdt, dudt, dwdt, dTdt, dmdt)
   use math, only : pi
   use thermochem
   use gravity_source
-  
+
   implicit none
 
   ! Arguments
@@ -785,7 +815,7 @@ subroutine particle_rhs(part, dxdt, dudt, dwdt, dTdt, dmdt)
 
   ! Get the total particle acceleration
   dudt = dragForce + stress / particleDensity + gravityForce + collisionForce + liftForce
-  
+
   ! Added mass contribution
   if (useAddedMass) then
      ! Mach/vol frac correction to the added mass coefficient from Koneru & Balachandar (2020)

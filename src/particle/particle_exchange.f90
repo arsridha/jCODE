@@ -16,12 +16,12 @@ module particle_exchange
   integer :: vaporIndex
   real(WP) :: diffusionAmount, filterSize, volumeFactor
   real(WP), dimension(:,:), allocatable :: cartesianCoordinates, particleVelocity,           &
-       granularTemperature
+       granularTemperature, collisionFrequency
   real(WP), dimension(:,:,:,:), allocatable :: fluidDensity, fluidTemperature,               &
        fluidViscosity, fluidVelocity, fluidVorticity, fluidStress, fluidVolumeFraction,      &
        momentumSource, energySource, massSource, fluidMassFraction, fluidPressure,           &
        cartScalar, cartVector, fluidGradRho, fluidDivRhoU, fluidLevelset, fluidLevelsetNormal
-  logical :: collisionsOn, useGranularTemperature, filterFluid
+  logical :: collisionsOn, useGranularTemperature, useCollisionFrequency, filterFluid
 
 contains
 
@@ -865,6 +865,7 @@ subroutine particle_exchange_setup
   ! Allocate particle dependent variables
   allocate(particleVelocity(nGridPoints, nDimensions)); particleVelocity = 0.0_WP
   allocate(granularTemperature(nGridPoints, 1))
+  allocate(collisionFrequency(nGridPoints, 1))
 
   return
 end subroutine particle_exchange_setup
@@ -901,6 +902,7 @@ subroutine particle_exchange_cleanup
   if (allocated(partInCell)) deallocate(partInCell)
   if (allocated(particleVelocity)) deallocate(particleVelocity)
   if (allocated(granularTemperature)) deallocate(granularTemperature)
+  if (allocated(collisionFrequency)) deallocate(collisionFrequency)
   if (allocated(cartScalar)) deallocate(cartScalar)
   if (allocated(cartVector)) deallocate(cartVector)
 
