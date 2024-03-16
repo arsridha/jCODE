@@ -298,6 +298,10 @@ contains
           ! Levelset
           str='scalar per node: 1 LEVELSET LEVELSET/LEVELSET.******'
           write(iunit,'(a80)') str
+
+          ! Object index
+          str='scalar per node: 1 OBJ_ID OBJ_ID/OBJ_ID.******'
+          write(iunit,'(a80)') str
           
           if (ibm_move) then
              str='vector per node: 1 IBM_VEL IBM_VEL/IBM_VEL.******'
@@ -1828,6 +1832,10 @@ subroutine dump_ensight_data(mode)
         ! Levelset
         name = 'LEVELSET'
         call dump_ensight_scalar(name, levelset(:,1))
+
+        ! Object index
+        name = 'OBJ_ID'
+        call dump_ensight_scalar(name, real(objectIndex,WP))
 
         if (ibm_move) then
            name = 'IBM_VEL'
