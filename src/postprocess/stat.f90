@@ -15,7 +15,8 @@ module stat
                         COMPRESS_PATCH = 3,                                                  &
                         COMPRESS_IBM   = 4,                                                  &
                         COMPRESS_IBM_1D= 5,                                                  &
-                        COMPRESS_PART  = 6
+                        COMPRESS_PART  = 6,                                                  &
+                        COMPRESS_EL_IBM = 7
 
   ! Frequency of output
   real(WP) :: statFrequency
@@ -91,6 +92,10 @@ subroutine stat_setup
         statType(i) = COMPRESS_PART
         call stat_part_setup
 
+      case ('el-ibm')
+         statType(i) = COMPRESS_EL_IBM
+         call stat_el_ibm_setup  
+      
      case default
         call die("stat_setup: unknown output type '" // trim(inputType(i)) // "'")
 
@@ -138,6 +143,9 @@ subroutine stat_cleanup
 
      case (COMPRESS_PART)
         call stat_part_cleanup
+
+      case (COMPRESS_EL_IBM)
+         call stat_el_ibm_cleanup
 
      end select
   end do
@@ -190,6 +198,9 @@ subroutine dump_statistics
      case (COMPRESS_PART)
         call stat_part_compute
 
+      case (COMPRESS_EL_IBM)
+         call stat_el_ibm_compute
+
      end select
   end do
 
@@ -220,6 +231,9 @@ subroutine dump_statistics
 
            case (COMPRESS_PART)
               call stat_part_write
+
+            case (COMPRESS_EL_IBM)
+               call stat_el_ibm_write
 
            end select
 

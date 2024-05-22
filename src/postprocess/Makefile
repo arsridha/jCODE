@@ -1,7 +1,7 @@
 include ../Makefile.in
 
 F90FILES = dump_viz.f90 dump_ensight.f90 stat.f90 stat_1d.f90 stat_patch.f90 stat_ibm.f90    \
-	stat_ibm_1d.f90 stat_part.f90
+	stat_ibm_1d.f90 stat_part.f90 stat_el_ibm.f90
 LIBFILE = libpostprocess.a
 
 OFILES = $(F90FILES:.f90=.o)
