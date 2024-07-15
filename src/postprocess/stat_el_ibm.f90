@@ -140,6 +140,7 @@ subroutine stat_el_ibm_write
   use geometry
   use ibm
   use particle
+  use particle_exchange
   use grid
   use state
   use grid_functions
@@ -153,7 +154,8 @@ subroutine stat_el_ibm_write
   real(WP), dimension(nDimensions) :: uDoublePrime
   real(WP), dimension(nStatPoints, nDimensions) :: meanVelocity, favreVelocity      
   real(WP), dimension(nStatPoints) :: meanRho, meanUU, meanVV, meanWW, meanUV, meanUW,&
-       meanVW, alpha_ibm, alpha_lpt, volume_ibm, volume_lpt, totalVolume
+       meanVW, alpha_ibm, alpha_lpt, volume_ibm, volume_lpt, totalVolume,             &
+       mean_granTemp, colfreq_lpt, colfreq_ibmlpt
 
   ! Return if IBM is not used
   if (.not. useIBM .and. .not. useParticles) return
@@ -203,11 +205,18 @@ subroutine stat_el_ibm_write
   ! Compute variance
   meanUU = 0.0_WP; meanVV = 0.0_WP; meanWW = 0.0_WP
   meanUV = 0.0_WP; meanUW = 0.0_WP; meanVW = 0.0_WP  
-
+  mean_granTemp = 0.0_WP
+  colfreq_lpt = 0.0_WP
+  colfreq_ibmlpt = 0.0_WP
+  
   ! Compute higher order statistics
   do i = 1, nGridPoints
      j = 1 + nint((coordinates(i,1) - xmin) / dx)
      uDoublePrime = velocity(i,1:nDimensions) - favreVelocity(j,1:nDimensions)
+     ! Collision frequency and granular temperature
+     mean_granTemp(j) = mean_granTemp(j) + granularTemperature(i,1) *          &
+          primitiveGridNorm(i,1)
+     colfreq_lpt(j) = colfreq_lpt(j) + collisionFrequency(i,1) * primitiveGridNorm(i,1) 
      ! Reynolds stresses
      meanUU(j) = meanUU(j) + gridNorm(i,1) * conservedVariables(i,1) * uDoublePrime(1)**2
      if (nDimensions .gt. 1) then
@@ -229,7 +238,9 @@ subroutine stat_el_ibm_write
   call parallel_sum(meanUV); meanUV = meanUV / meanRho / volume_ibm
   call parallel_sum(meanUW); meanUW = meanUW / meanRho / volume_ibm
   call parallel_sum(meanVW); meanVW = meanVW / meanRho / volume_ibm
-
+  call parallel_sum(mean_granTemp); mean_granTemp = mean_granTemp/totalVolume
+  call parallel_sum(colfreq_lpt); colfreq_lpt = colfreq_lpt/totalVolume
+  
   ! Root process writes
   if (iRank .eq. iRoot) then
 
@@ -240,14 +251,15 @@ subroutine stat_el_ibm_write
      iunit = iopen()
      open (iunit, file=adjustl(trim(filename)), form="formatted",iostat=ierror)
      write(iunit,'(A,1ES21.12)') "t=",time
-     write(iunit,'(17a21)') "X", "alphaibm", "alphalpt", "Volume", "<U>", "<V>", "<W>",     &
+     write(iunit,'(19a21)') "X", "alphaibm", "alphalpt", "Volume", "<U>", "<V>", "<W>",     &
           "<U'U'>", "<V'V'>", "<W'W'>", "<U'V'>", "<V'W'>", "<U'W'>", "<rho>",              &
-          "Utilde", "Vtilde", "Wtilde"
+          "Utilde", "Vtilde", "Wtilde", "Theta", "colfreq_lpt"
      do i = 1, nStatPoints
         write(iunit,'(10000ES21.12E3)') grid1D(i), alpha_ibm(i), alpha_lpt(i), totalVolume(i), &
-             meanVelocity(i,1), meanVelocity(i,2), meanVelocity(i,3), meanUU(i), meanVV(i), &
-             meanWW(i), meanUV(i), meanVW(i), meanUW(i), meanRho(i),                        &
-             favreVelocity(i,1), favreVelocity(i,2), favreVelocity(i,3)
+             meanVelocity(i,1), meanVelocity(i,2), meanVelocity(i,3), meanUU(i), meanVV(i),  &
+             meanWW(i), meanUV(i), meanVW(i), meanUW(i), meanRho(i),                         &
+             favreVelocity(i,1), favreVelocity(i,2), favreVelocity(i,3), mean_granTemp(i),   &
+             colfreq_lpt(i)
      end do
      close(iclose(iunit))
      
