@@ -273,12 +273,15 @@ subroutine compute_particle_collisions
   real(WP) :: d1, d2, mass1, mass2, volume1, volume2, particleSeparation, radiusOfInfluence, &
        delta, rnv, effectiveMass, springForce, damper, rtv, buf
   real(WP), dimension(3) :: pos1, pos2, vel1, vel2, n12, v12, v12n, normalCollision,         &
-       omega1, omega2, t12, tangentialCollision
+       omega1, omega2, t12, tangentialCollision, momentumPartIBM
 
   ! Reset particle collision counter
   nParticleCollisions = 0
   nParticleParticleCollisions=0
   nParticleIBMCollisions=0
+  cartScalar = 0.0_WP
+  cartScalar1 = 0.0_WP
+  momentumPartIBM = 0.0_WP
 
   if (.not. collisionsOn) return
 
@@ -505,8 +508,21 @@ subroutine compute_particle_collisions
            ! Get forces/torques from IBM
            call compute_ibm_particle_collisions(useFriction, collisionTime,                  &
                 coefficientOfRestitution, coefficientOfFriction, particles(ip)%gridIndex,    &
-                delta, pos1, vel1, omega1, d1, mass1, n12, particles(ip)%collision,          &
+                delta, pos1, vel1, omega1, d1, mass1, n12, momentumPartIBM,                  &
                 particles(ip)%torque, nParticleCollisions,nParticleIBMCollisions)
+           ! Add acceleration due to collision
+           particles(ip)%collision = particles(ip)%collision + momentumPartIBM
+           
+           ! Collision frequency IBM-part
+           if (useCollisionFrequency) then
+              ! Extrapolate collision frequency
+              call extrapolate_particle_to_grid(particles(ip)%gridIndex,                     &
+                   particles(ip)%position, volume1/timeStepSize, cartScalar1(:,:,:,1))
+              ! Extrapolate collision momentum exchange (IBM-part)
+              call extrapolate_particle_to_grid(particles(ip)%gridIndex,                     &
+                   particles(ip)%position, mass1 * timeStepSize * momentumPartIBM(1),        &
+                   cartScalar2(:,:,:,1))
+           end if
         end if
      end if
 
@@ -632,6 +648,8 @@ subroutine compute_particle_collisions
      ! Communicate at the borders
      do i = 1, nDimensions
         call border_summation(cartScalar, i, (/nOverlap(i,1), nOverlap(i,2) /))
+        call border_summation(cartScalar1, i, (/nOverlap(i,1), nOverlap(i,2) /))
+        call border_summation(cartScalar2, i, (/nOverlap(i,1), nOverlap(i,2) /))
      end do
 
      ! Send back granular temperature and normalize
@@ -642,13 +660,16 @@ subroutine compute_particle_collisions
                    (j - 1 - gridOffset(2) + localGridSize(2) *                                &
                    (k - 1 - gridOffset(3)))
               collisionFrequency(gridIndex, 1) = cartScalar(i,j,k,1) * jacobian(gridIndex, 1)
+              collisionFrequencyPartIBM(gridIndex, 1) = cartScalar1(i,j,k,1) * jacobian(gridIndex, 1)
+              collisionMomentum(gridIndex, 1) = cartScalar2(i,j,k,1) * jacobian(gridIndex, 1)
            end do
         end do
      end do
 
      ! Filter
      call filter_extrapolated_field(collisionFrequency(:,1:1))
-
+     call filter_extrapolated_field(collisionFrequencyPartIBM(:,1:1))
+     call filter_extrapolated_field(collisionMomentum(:,1:1))
   end if
 
   ! Add up particle collision counter

@@ -16,11 +16,12 @@ module particle_exchange
   integer :: vaporIndex
   real(WP) :: diffusionAmount, filterSize, volumeFactor
   real(WP), dimension(:,:), allocatable :: cartesianCoordinates, particleVelocity,           &
-       granularTemperature, collisionFrequency
+       granularTemperature, collisionFrequency, collisionFrequencyPartIBM, collisionMomentum
   real(WP), dimension(:,:,:,:), allocatable :: fluidDensity, fluidTemperature,               &
        fluidViscosity, fluidVelocity, fluidVorticity, fluidStress, fluidVolumeFraction,      &
        momentumSource, energySource, massSource, fluidMassFraction, fluidPressure,           &
-       cartScalar, cartVector, fluidGradRho, fluidDivRhoU, fluidLevelset, fluidLevelsetNormal
+       cartScalar, cartScalar1, cartScalar2, cartVector, fluidGradRho, fluidDivRhoU,         &
+       fluidLevelset, fluidLevelsetNormal
   logical :: collisionsOn, useGranularTemperature, useCollisionFrequency, filterFluid
 
 contains
@@ -859,6 +860,8 @@ subroutine particle_exchange_setup
 
   ! Allocate the temporary Cartesian arrays
   allocate(cartScalar(pStart(1) : pEnd(1), pStart(2) : pEnd(2), pStart(3) : pEnd(3), 1))
+  allocate(cartScalar1(pStart(1) : pEnd(1), pStart(2) : pEnd(2), pStart(3) : pEnd(3), 1))
+  allocate(cartScalar2(pStart(1) : pEnd(1), pStart(2) : pEnd(2), pStart(3) : pEnd(3), 1))
   allocate(cartVector(pStart(1) : pEnd(1), pStart(2) : pEnd(2), pStart(3) : pEnd(3), nDimensions))
 
   ! Allocate the particle localization arrays
@@ -873,6 +876,8 @@ subroutine particle_exchange_setup
   allocate(particleVelocity(nGridPoints, nDimensions)); particleVelocity = 0.0_WP
   allocate(granularTemperature(nGridPoints, 1))
   allocate(collisionFrequency(nGridPoints, 1))
+  allocate(collisionFrequencyPartIBM(nGridPoints, 1))
+  allocate(collisionMomentum(nGridPoints, 1))
 
   return
 end subroutine particle_exchange_setup
@@ -910,7 +915,11 @@ subroutine particle_exchange_cleanup
   if (allocated(particleVelocity)) deallocate(particleVelocity)
   if (allocated(granularTemperature)) deallocate(granularTemperature)
   if (allocated(collisionFrequency)) deallocate(collisionFrequency)
+  if (allocated(collisionFrequencyPartIBM)) deallocate(collisionFrequencyPartIBM)
+  if (allocated(collisionMomentum)) deallocate(collisionMomentum)
   if (allocated(cartScalar)) deallocate(cartScalar)
+  if (allocated(cartScalar1)) deallocate(cartScalar1)
+  if (allocated(cartScalar2)) deallocate(cartScalar2)
   if (allocated(cartVector)) deallocate(cartVector)
 
   return

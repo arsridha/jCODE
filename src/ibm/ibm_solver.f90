@@ -404,6 +404,8 @@ subroutine compute_ibm_particle_collisions(useFriction, colTime, coefRest, mu, g
   use grid
   use grid_functions
   use time_info, only : timestepSize
+  use parallel
+  use grid_levelset
 
   implicit none
 
@@ -423,7 +425,15 @@ subroutine compute_ibm_particle_collisions(useFriction, colTime, coefRest, mu, g
   ! IBM parameters
   if (ibmType.eq.IBM_PARTICLE) then
      jp = objectIndex(grid_index(gridIndex(1), gridIndex(2), gridIndex(3)))
-     if (jp.le.0) call die('compute_ibm_particle_collisions: problem localizing IBM particle')
+     if (jp.le.0) then 
+          !if (iRank.eq.iRoot) then
+          write(*, *) "Grid point ",  gridIndex(1), gridIndex(2), gridIndex(3), "."
+          print *, "levelset", levelset(grid_index(gridIndex(1), gridIndex(2), gridIndex(3)),1)
+          print *, "delta", delta
+          print *, "pos1", pos1
+          print *, "object Index", jp
+          call die('compute_ibm_particle_collisions: problem localizing IBM particle')
+     end if
      vel2   = object(jp)%velocity
      omega2 = object(jp)%angularVelocity
      d2     = (2.0_WP * real(nDimensions, WP) * object(jp)%volume / pi)                      &
