@@ -152,11 +152,12 @@ subroutine stat_el_ibm_write
   character(len=str_medium) :: filename
   integer  :: i, j, n, iunit, ierror
   real(WP), dimension(nDimensions) :: uDoublePrime
-  real(WP), dimension(nStatPoints, nDimensions) :: meanVelocity, favreVelocity      
+  real(WP), dimension(nStatPoints, nDimensions) :: meanVelocity, favreVelocity,       &
+       meanVelocity_ibm, meanVelocity_part      
   real(WP), dimension(nStatPoints) :: meanRho, meanUU, meanVV, meanWW, meanUV, meanUW,&
        meanVW, alpha_ibm, alpha_lpt, volume_ibm, volume_lpt, totalVolume,             &
        mean_granTemp, colfreqPartPart, colfreqPartIBM, colMomPartIBM
-
+  
   ! Return if IBM is not used
   if (.not. useIBM .and. .not. useParticles) return
     
@@ -167,6 +168,11 @@ subroutine stat_el_ibm_write
   totalVolume = 0.0_WP
   volume_ibm = 0.0_WP
   volume_lpt = 0.0_WP
+  colfreqPartPart = 0.0_WP
+  colfreqPartIBM = 0.0_WP
+  colMomPartIBM = 0.0_WP
+  meanVelocity_part = 0.0_WP
+  meanVelocity_ibm = 0.0_WP
   
   do i = 1, nGridPoints
     j = 1 + nint((coordinates(i,1) - xmin) / dx)
@@ -180,40 +186,10 @@ subroutine stat_el_ibm_write
           gridNorm(i,1) * velocity(i,1:nDimensions)
      favreVelocity(j,1:nDimensions) = favreVelocity(j,1:nDimensions) +                       &
           gridNorm(i,1) * conservedVariables(i,2:nDimensions+1)
-  end do
-  
-  ! Sum them over procs
-  call parallel_sum(volume_ibm)
-  call parallel_sum(volume_lpt)
-  call parallel_sum(totalVolume)
-  call parallel_sum(meanRho)
-
-  do i = 1, nDimensions
-     call parallel_sum(meanVelocity(:,i))
-     call parallel_sum(favreVelocity(:,i))
-  end do
-
-  ! Normalize
-  do i = 1, nStatPoints
-     alpha_ibm(i) = 1.0_WP - (volume_ibm(i) / totalVolume(i))            ! Mean volume fraction for IBM
-     alpha_lpt(i) = volume_lpt(i) / totalVolume(i)            ! Mean volume fraction for IBM
-     meanRho(i) = meanRho(i) / volume_ibm(i)
-     meanVelocity(i,:) = meanVelocity(i,:) / volume_ibm(i)
-     favreVelocity(i,:) = favreVelocity(i,:) / volume_ibm(i) / meanRho(i)
-  end do
-
-  ! Compute variance
-  meanUU = 0.0_WP; meanVV = 0.0_WP; meanWW = 0.0_WP
-  meanUV = 0.0_WP; meanUW = 0.0_WP; meanVW = 0.0_WP  
-  mean_granTemp = 0.0_WP
-  colfreqPartPart = 0.0_WP
-  colfreqPartIBM = 0.0_WP
-  colMomPartIBM = 0.0_WP
-  
-  ! Compute higher order statistics
-  do i = 1, nGridPoints
-     j = 1 + nint((coordinates(i,1) - xmin) / dx)
-     uDoublePrime = velocity(i,1:nDimensions) - favreVelocity(j,1:nDimensions)
+     meanVelocity_part(j,1:nDimensions) = meanVelocity_part(j,1:nDimensions) +               &
+          primitiveGridNorm(i,1) * particleVelocity(i,1:nDimensions)
+     meanVelocity_ibm(j,1:nDimensions) =  meanVelocity_ibm(j,1:nDimensions) +                &
+          gridNorm(i,1) * ibmVelocity(i,1:nDimensions)
      ! Collision frequency and granular temperature
      mean_granTemp(j) = mean_granTemp(j) + granularTemperature(i,1) *                        &
           primitiveGridNorm(i,1) * (1.0_WP - volumeFraction(i,1) )
@@ -223,6 +199,51 @@ subroutine stat_el_ibm_write
           primitiveGridNorm(i,1)
      colMomPartIBM(j) = colMomPartIBM(j) + collisionMomentum(i,1) *                          &
           primitiveGridNorm(i,1) * (1.0_WP - volumeFraction(i,1) )
+  end do
+  
+  ! Sum them over procs
+  call parallel_sum(volume_ibm)
+  call parallel_sum(volume_lpt)
+  call parallel_sum(totalVolume)
+  call parallel_sum(meanRho)    
+  call parallel_sum(mean_granTemp)
+  call parallel_sum(colfreqPartPart)
+  call parallel_sum(colfreqPartIBM)
+  call parallel_sum(colMomPartIBM)
+  do i = 1, nDimensions
+     call parallel_sum(meanVelocity(:,i))
+     call parallel_sum(favreVelocity(:,i))
+     call parallel_sum(meanVelocity_part(:,i))
+     call parallel_sum(meanVelocity_ibm(:,i))     
+  end do
+  
+  ! Normalize
+  do i = 1, nStatPoints
+     alpha_ibm(i) = 1.0_WP - (volume_ibm(i) / totalVolume(i))            ! Mean volume fraction for IBM
+     alpha_lpt(i) = volume_lpt(i) / totalVolume(i)            ! Mean volume fraction for IBM
+     meanRho(i) = meanRho(i) / volume_ibm(i)
+     meanVelocity(i,:) = meanVelocity(i,:) / volume_ibm(i)
+     favreVelocity(i,:) = favreVelocity(i,:) / volume_ibm(i) / meanRho(i)
+     meanVelocity_ibm(i,:) = meanVelocity_ibm(i,:) / volume_ibm(i) 
+     if (volume_lpt(i) .gt. 0.0_WP) then 
+          mean_granTemp(i) = mean_granTemp(i)/volume_lpt(i)
+          colfreqPartPart(i) = colfreqPartPart(i)/volume_lpt(i) !  0.5_WP *
+          colfreqPartIBM(i) = colfreqPartIBM(i)/volume_lpt(i)
+          colMomPartIBM(i) = colMomPartIBM(i)/volume_lpt(i)
+          meanVelocity_part(i,:) = meanVelocity_part(i,:) / volume_lpt(i) 
+     end if
+  end do
+
+  ! Compute variance
+  meanUU = 0.0_WP; meanVV = 0.0_WP; meanWW = 0.0_WP
+  meanUV = 0.0_WP; meanUW = 0.0_WP; meanVW = 0.0_WP  
+  mean_granTemp = 0.0_WP
+    
+  ! Compute higher order statistics
+  do i = 1, nGridPoints
+     j = 1 + nint((coordinates(i,1) - xmin) / dx)
+     uDoublePrime = velocity(i,1:nDimensions) - favreVelocity(j,1:nDimensions)
+     
      ! Reynolds stresses
      meanUU(j) = meanUU(j) + gridNorm(i,1) * conservedVariables(i,1) * uDoublePrime(1)**2
      if (nDimensions .gt. 1) then
@@ -245,19 +266,6 @@ subroutine stat_el_ibm_write
   call parallel_sum(meanUW); meanUW = meanUW / meanRho / volume_ibm
   call parallel_sum(meanVW); meanVW = meanVW / meanRho / volume_ibm
   
-  call parallel_sum(mean_granTemp)
-  call parallel_sum(colfreqPartPart)
-  call parallel_sum(colfreqPartIBM)
-  call parallel_sum(colMomPartIBM)
-  
-  do i=1, nStatPoints     
-     if (volume_lpt(i) .gt. 0.0_WP) then 
-          mean_granTemp(i) = mean_granTemp(i)/volume_lpt(i)
-          colfreqPartPart(i) = 0.5_WP * colfreqPartPart(i)/volume_lpt(i)
-          colfreqPartIBM(i) = colfreqPartIBM(i)/volume_lpt(i)
-          colMomPartIBM(i) = colMomPartIBM(i)/volume_lpt(i)
-     end if
-  end do
   ! Root process writes
   if (iRank .eq. iRoot) then
 
@@ -268,16 +276,18 @@ subroutine stat_el_ibm_write
      iunit = iopen()
      open (iunit, file=adjustl(trim(filename)), form="formatted",iostat=ierror)
      write(iunit,'(A,1ES21.12)') "t=",time
-     write(iunit,'(21a21)') "X", "alphaibm", "alphalpt", "Volume", "<U>", "<V>", "<W>",     &
+     write(iunit,'(27a21)') "X", "alphaibm", "alphalpt", "Volume", "<U>", "<V>", "<W>",     &
           "<U'U'>", "<V'V'>", "<W'W'>", "<U'V'>", "<V'W'>", "<U'W'>", "<rho>",              &
           "Utilde", "Vtilde", "Wtilde", "Theta" , "colfreqPartPart", "colfreqPartIBM",      &
-          "colMomPartIBM"
+          "colMomPartIBM", "<Uibm>","<Vibm>","<Wibm>", "<Ulpt>","Vlpt>","<Wlpt>"
      do i = 1, nStatPoints
         write(iunit,'(10000ES21.12E3)') grid1D(i), alpha_ibm(i), alpha_lpt(i), totalVolume(i), &
              meanVelocity(i,1), meanVelocity(i,2), meanVelocity(i,3), meanUU(i), meanVV(i),  &
              meanWW(i), meanUV(i), meanVW(i), meanUW(i), meanRho(i),                         &
              favreVelocity(i,1), favreVelocity(i,2), favreVelocity(i,3), mean_granTemp(i),   &
-             colfreqPartPart(i), colfreqPartIBM(i), colMomPartIBM(i)
+             colfreqPartPart(i), colfreqPartIBM(i), colMomPartIBM(i), meanVelocity_ibm(i,1), &
+             meanVelocity_ibm(i,2), meanVelocity_ibm(i,3), meanVelocity_part(i,1),           &
+             meanVelocity_part(i,2), meanVelocity_part(i,3) 
      end do
      close(iclose(iunit))
      
