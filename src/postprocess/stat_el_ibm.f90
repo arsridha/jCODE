@@ -139,6 +139,7 @@ subroutine stat_el_ibm_write
   use math
   use geometry
   use ibm
+  use ibm_ghost_point
   use particle
   use particle_exchange
   use grid
@@ -168,6 +169,7 @@ subroutine stat_el_ibm_write
   totalVolume = 0.0_WP
   volume_ibm = 0.0_WP
   volume_lpt = 0.0_WP
+  mean_granTemp = 0.0_WP
   colfreqPartPart = 0.0_WP
   colfreqPartIBM = 0.0_WP
   colMomPartIBM = 0.0_WP
@@ -187,7 +189,8 @@ subroutine stat_el_ibm_write
      favreVelocity(j,1:nDimensions) = favreVelocity(j,1:nDimensions) +                       &
           gridNorm(i,1) * conservedVariables(i,2:nDimensions+1)
      meanVelocity_part(j,1:nDimensions) = meanVelocity_part(j,1:nDimensions) +               &
-          primitiveGridNorm(i,1) * particleVelocity(i,1:nDimensions)
+          primitiveGridNorm(i,1) * particleVelocity(i,1:nDimensions) *                       &
+          (1.0_WP - volumeFraction(i,1))
      meanVelocity_ibm(j,1:nDimensions) =  meanVelocity_ibm(j,1:nDimensions) +                &
           gridNorm(i,1) * ibmVelocity(i,1:nDimensions)
      ! Collision frequency and granular temperature
@@ -237,8 +240,7 @@ subroutine stat_el_ibm_write
   ! Compute variance
   meanUU = 0.0_WP; meanVV = 0.0_WP; meanWW = 0.0_WP
   meanUV = 0.0_WP; meanUW = 0.0_WP; meanVW = 0.0_WP  
-  mean_granTemp = 0.0_WP
-    
+   
   ! Compute higher order statistics
   do i = 1, nGridPoints
      j = 1 + nint((coordinates(i,1) - xmin) / dx)
