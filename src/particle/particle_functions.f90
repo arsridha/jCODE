@@ -102,9 +102,13 @@ subroutine compute_particle_dependent_variables
      volume = volumeFactor * particles(i)%diameter**nDimensions
      call extrapolate_particle_to_grid(particles(i)%gridIndex, particles(i)%position,        &
           volume, cartScalar(:,:,:,1))
+     ! Interpolate
+     call interpolate_fluid_to_particle(particles(i)%gridIndex, particles(i)%position,       &
+          volumeFraction = ep)
+     ep = 1.0_WP - ep
      do j = 1, nDimensions
         call extrapolate_particle_to_grid(particles(i)%gridIndex, particles(i)%position,     &
-             particles(i)%velocity(j) * volume, cartVector(:,:,:,j))
+             particles(i)%velocity(j) * volume /ep, cartVector(:,:,:,j))
        end do
   end do
 
@@ -131,9 +135,9 @@ subroutine compute_particle_dependent_variables
   ! Filter and remove volume fraction
   call filter_extrapolated_field(volumeFraction(:,1:1))
   call filter_extrapolated_field(particleVelocity(:,1:nDimensions))
-  do i = 1, nDimensions
-     particleVelocity(:,i) = particleVelocity(:,i) / (volumeFraction(:,1) + epsilon(1.0_WP))
-  end do
+  !do i = 1, nDimensions
+  !   particleVelocity(:,i) = particleVelocity(:,i) / (volumeFraction(:,1) + epsilon(1.0_WP))
+  !end do
   
   ! Store the fluid volume fraction
   volumeFraction(:,1) = 1.0_WP - volumeFraction(:,1)

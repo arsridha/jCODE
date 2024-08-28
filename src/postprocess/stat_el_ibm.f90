@@ -192,14 +192,15 @@ subroutine stat_el_ibm_write
           primitiveGridNorm(i,1) * particleVelocity(i,1:nDimensions) *                       &
           (1.0_WP - volumeFraction(i,1))
      meanVelocity_ibm(j,1:nDimensions) =  meanVelocity_ibm(j,1:nDimensions) +                &
-          gridNorm(i,1) * ibmVelocity(i,1:nDimensions)
+          primitiveGridNorm(i,1) * (1.0_WP - indicatorFunction(i,1)) *                       &
+          ibmVelocity(i,1:nDimensions)
      ! Collision frequency and granular temperature
      mean_granTemp(j) = mean_granTemp(j) + granularTemperature(i,1) *                        &
           primitiveGridNorm(i,1) * (1.0_WP - volumeFraction(i,1) )
      colfreqPartPart(j) = colfreqPartPart(j) + collisionFrequency(i,1) *                     &
-          primitiveGridNorm(i,1)
+          primitiveGridNorm(i,1) * (1.0_WP - volumeFraction(i,1) )
      colfreqPartIBM(j) = colfreqPartIBM(j) + collisionFrequencyPartIBM(i,1) *                &
-          primitiveGridNorm(i,1)
+          primitiveGridNorm(i,1) * (1.0_WP - volumeFraction(i,1) )
      colMomPartIBM(j) = colMomPartIBM(j) + collisionMomentum(i,1) *                          &
           primitiveGridNorm(i,1) * (1.0_WP - volumeFraction(i,1) )
   end do
@@ -222,15 +223,15 @@ subroutine stat_el_ibm_write
   
   ! Normalize
   do i = 1, nStatPoints
-     alpha_ibm(i) = 1.0_WP - (volume_ibm(i) / totalVolume(i))            ! Mean volume fraction for IBM
-     alpha_lpt(i) = volume_lpt(i) / totalVolume(i)            ! Mean volume fraction for IBM
+     alpha_ibm(i) = 1.0_WP - (volume_ibm(i) / totalVolume(i))            
+     alpha_lpt(i) = volume_lpt(i) / totalVolume(i)            
      meanRho(i) = meanRho(i) / volume_ibm(i)
      meanVelocity(i,:) = meanVelocity(i,:) / volume_ibm(i)
      favreVelocity(i,:) = favreVelocity(i,:) / volume_ibm(i) / meanRho(i)
      meanVelocity_ibm(i,:) = meanVelocity_ibm(i,:) / volume_ibm(i) 
      if (volume_lpt(i) .gt. 0.0_WP) then 
           mean_granTemp(i) = mean_granTemp(i)/volume_lpt(i)
-          colfreqPartPart(i) = colfreqPartPart(i)/volume_lpt(i) !  0.5_WP *
+          colfreqPartPart(i) = colfreqPartPart(i)/volume_lpt(i) 
           colfreqPartIBM(i) = colfreqPartIBM(i)/volume_lpt(i)
           colMomPartIBM(i) = colMomPartIBM(i)/volume_lpt(i)
           meanVelocity_part(i,:) = meanVelocity_part(i,:) / volume_lpt(i) 

@@ -262,7 +262,8 @@ subroutine compute_particle_collisions
   use math
   use geometry
   use time_info, only : timestepSize
-
+  use grid_levelset
+  use state
   implicit none
 
   ! Local variables
@@ -271,7 +272,7 @@ subroutine compute_particle_collisions
   real(WP), parameter :: oneSixth = 1.0_WP / 6.0_WP
   real(WP), parameter :: clipCol = 0.2_WP
   real(WP) :: d1, d2, mass1, mass2, volume1, volume2, particleSeparation, radiusOfInfluence, &
-       delta, rnv, effectiveMass, springForce, damper, rtv, buf
+       delta, rnv, effectiveMass, springForce, damper, rtv, buf, volume0d, ep
   real(WP), dimension(3) :: pos1, pos2, vel1, vel2, n12, v12, v12n, normalCollision,         &
        omega1, omega2, t12, tangentialCollision, momentumPartIBM
 
@@ -282,7 +283,7 @@ subroutine compute_particle_collisions
   cartScalar = 0.0_WP
   cartScalar1 = 0.0_WP
   momentumPartIBM = 0.0_WP
-
+  
   if (.not. collisionsOn) return
 
   ! Set collision time to be 20x the simulation timestep
@@ -515,13 +516,16 @@ subroutine compute_particle_collisions
            
            ! Collision frequency IBM-part
            if (useCollisionFrequency) then
+              call interpolate_fluid_to_particle(particles(ip)%gridIndex,     &
+                   particles(ip)%position,volumeFraction = ep)
+              ep = 1.0_WP - ep
               ! Extrapolate collision frequency
               call extrapolate_particle_to_grid(particles(ip)%gridIndex,                     &
-                   particles(ip)%position, volume1/timeStepSize, cartScalar1(:,:,:,1))
+                   particles(ip)%position, volume1/timeStepSize/ep, cartScalar1(:,:,:,1))
               ! Extrapolate collision momentum exchange (IBM-part)
               call extrapolate_particle_to_grid(particles(ip)%gridIndex,                     &
-                   particles(ip)%position, mass1 * timeStepSize * momentumPartIBM(1),        &
-                   cartScalar2(:,:,:,1))
+                   particles(ip)%position, volume1 * mass1 * timeStepSize *                  &
+                   momentumPartIBM(1)/ep, cartScalar2(:,:,:,1))
            end if
         end if
      end if
@@ -561,8 +565,8 @@ subroutine compute_particle_collisions
                        vel2   = particles(jp)%velocity
                        omega2 = particles(jp)%angularVelocity
                        d2     = particles(jp)%diameter
-                       mass2  = oneSixth * particleDensity * pi * d2**3
-                       volume2 = oneSixth * pi * d2**3
+                       mass2  =  oneSixth * particleDensity * pi * d2**3
+                       volume2 = volumeFactor * d2**nDimensions 
                     else
                        ! Get data from ghost particles
                        jp     = -jp
@@ -631,8 +635,11 @@ subroutine compute_particle_collisions
                           nParticleCollisions = nParticleCollisions + 1
                           nParticleParticleCollisions = nParticleParticleCollisions + 1
                           if (useCollisionFrequency) then
+                             call interpolate_fluid_to_particle(particles(ip)%gridIndex,     &
+                                  particles(ip)%position,volumeFraction = ep)
+                             ep = 1.0_WP - ep
                              call extrapolate_particle_to_grid(particles(ip)%gridIndex,      &
-                                  particles(ip)%position, volume1/timeStepSize,              &
+                                  particles(ip)%position, 0.5_WP * volume1/timeStepSize/ep,  &   
                                   cartScalar(:,:,:,1))
                           end if
                        end if
@@ -643,7 +650,7 @@ subroutine compute_particle_collisions
         end do
      end if
   end do
-
+  
   if (useCollisionFrequency) then
      ! Communicate at the borders
      do i = 1, nDimensions
@@ -652,15 +659,16 @@ subroutine compute_particle_collisions
         call border_summation(cartScalar2, i, (/nOverlap(i,1), nOverlap(i,2) /))
      end do
 
-     ! Send back granular temperature and normalize
+     ! Send back collision frequency and normalize
      do k = iStart(3), iEnd(3)
         do j = iStart(2), iEnd(2)
            do i =  iStart(1), iEnd(1)
-              gridIndex = i - gridOffset(1) + localGridSize(1) *                              &
-                   (j - 1 - gridOffset(2) + localGridSize(2) *                                &
+              gridIndex = i - gridOffset(1) + localGridSize(1) *                             &
+                   (j - 1 - gridOffset(2) + localGridSize(2) *                               &
                    (k - 1 - gridOffset(3)))
               collisionFrequency(gridIndex, 1) = cartScalar(i,j,k,1) * jacobian(gridIndex, 1)
-              collisionFrequencyPartIBM(gridIndex, 1) = cartScalar1(i,j,k,1) * jacobian(gridIndex, 1)
+              collisionFrequencyPartIBM(gridIndex, 1) = cartScalar1(i,j,k,1) *               &
+                   jacobian(gridIndex, 1)
               collisionMomentum(gridIndex, 1) = cartScalar2(i,j,k,1) * jacobian(gridIndex, 1)
            end do
         end do
