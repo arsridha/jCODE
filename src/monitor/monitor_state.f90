@@ -87,7 +87,11 @@ subroutine monitor_state_setup(mode, controlIteration)
            call monitor_set_header(2, 'max', 'r')
            call monitor_set_header(3, 'mean', 'r')
         end if
-
+        if (useIBM) then
+           call monitor_create('ptke', 3)
+           call monitor_set_header(1, 'mean', 'r')
+        end if
+        
      else
 
         ! -------------------------------------
@@ -138,7 +142,7 @@ subroutine monitor_state_forward(controlIteration)
 
   ! Local variables
   integer :: i, j
-  real(WP) :: minRho, maxRho, meanRho, minU(3), maxU(3), meanU(3),                           &
+  real(WP) :: minRho, maxRho, meanRho, minU(3), maxU(3), meanU(3), meank, uPrime(3),         &
        minT, maxT, meanT, minP, maxP, meanP, minVF, maxVF, meanVF, Tref, volumeInverse
   real(WP), allocatable, dimension(:) :: minY, maxY, meanY
 
@@ -209,7 +213,16 @@ subroutine monitor_state_forward(controlIteration)
         call parallel_sum(meanY(i))
         meanY(i) = meanY(i) * volumeInverse / meanRho
      end do
-
+     meank = 0.0_WP
+     ! Compute mean TKE
+     do i =1, nGridPoints
+        uPrime(1:nDimensions) = velocity(i,1:nDimensions) - meanU(1:nDimensions)
+        meank = meank + 0.5_WP * sum(uPrime(1:nDimensions)**2) * conservedVariables(i, 1) *  &
+             gridNorm(i, 1)
+     end do
+     call parallel_sum(meank)
+     meank = meank * volumeInverse / meanRho
+        
      ! Dimensionalize the temperature
      Tref = (ratioOfSpecificHeats - 1.0_WP) * 293.15_WP
      minT = minT * Tref
@@ -270,7 +283,12 @@ subroutine monitor_state_forward(controlIteration)
         call monitor_set_single_value(2, maxVF)
         call monitor_set_single_value(3, meanVF)
      end if
-
+     ! Set ptke
+     if (useIBM) then
+        call monitor_select('ptke')
+        call monitor_set_single_value(1, meank)
+     end if
+     
   else
 
      ! --------------------------------------
