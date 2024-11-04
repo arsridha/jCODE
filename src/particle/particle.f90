@@ -24,7 +24,7 @@ module particle
   integer :: nParticles=0, nParticlesGlobal=0, nGhostParticles=0
   integer :: nParticlesIn, nParticlesPrevious
   integer :: MPI_PARTICLE, SIZE_MPI_PARTICLE
-  real(WP) :: particleDensity, particleSpecificHeat
+  real(WP) :: particleDensity, particleSpecificHeat,colfreq0d
   logical :: useSaffmanLift, useAddedMass, useParticleHeat, usePhaseChange, useFriction
 
   ! Monitor particle info

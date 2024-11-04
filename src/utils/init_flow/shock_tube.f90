@@ -235,6 +235,9 @@ subroutine shock_tube_particles
 
   select case (trim(particleDistribution))
 
+  case ('two_part')
+     nParticlesGlobal = 2
+     
   case ('random')
 
      ! Get the number of particles based on the volume fraction and distribute to processors
@@ -373,6 +376,12 @@ subroutine shock_tube_particles
         particles(i)%position(3) = (iz + 0.5_WP) * Lpz - 0.5_WP * Lz
      end do
 
+  case ('two_part')
+     particles(1)%position(1) = x0 
+     particles(1)%position(2) = 0.0_WP
+     particles(2)%position(1) = x0 + 0.8_WP * dMean
+     particles(2)%position(2) = 0.0_WP
+     
   end select
 
   ! Output stuff to the screen.

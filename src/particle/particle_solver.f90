@@ -349,9 +349,9 @@ subroutine compute_particle_collisions
      vel1   = particles(ip)%velocity
      omega1 = particles(ip)%angularVelocity
      d1     = particles(ip)%diameter
-     mass1  = oneSixth * particleDensity * pi * d1**3
-     volume1 = oneSixth * pi * d1**3
-
+     mass1  =  oneSixth * particleDensity * pi * d1**nDimensions 
+     volume1 = volumeFactor * d1**nDimensions
+     
      ! Particle-wall collisions
      ! ------------------------
 
@@ -575,8 +575,8 @@ subroutine compute_particle_collisions
                        vel2   = ghostParticles(jp)%velocity
                        omega2 = ghostParticles(jp)%angularVelocity
                        d2     = ghostParticles(jp)%diameter
-                       mass2  = oneSixth * particleDensity * pi * d2**3
-                       volume2 = oneSixth * pi * d2**3
+                       mass2  =  volumeFactor * particleDensity * pi *d2**nDimensions 
+                       volume2 = volumeFactor * d2**nDimensions
                     end if
 
                     ! Distance between particles `1` and `2`
@@ -678,8 +678,20 @@ subroutine compute_particle_collisions
      call filter_extrapolated_field(collisionFrequency(:,1:1))
      call filter_extrapolated_field(collisionFrequencyPartIBM(:,1:1))
      call filter_extrapolated_field(collisionMomentum(:,1:1))
-  end if
 
+  end if
+  
+  !colfreq0d = 0.0_WP
+  !volume0d = 0.0_WP
+  !do i=1, nGridPoints
+  !   colfreq0d = colfreq0d + collisionFrequency(i,1) *  primitiveGridNorm(i,1)
+  !   volume0d = volume0d + (1.0_WP-volumeFraction(i,1)) * primitiveGridNorm(i,1)
+  !end do
+
+  !call parallel_sum(colfreq0d)
+  !call parallel_sum(volume0d)
+  !colfreq0d = colfreq0d / volume0d
+  
   ! Add up particle collision counter
   call parallel_sum(nParticleCollisions)
   call parallel_sum(nParticleParticleCollisions)
