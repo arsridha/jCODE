@@ -35,7 +35,7 @@ subroutine stat_el_ibm_setup
   integer :: i
   
   ! Return if IBM is not used
-  if (.not. useIBM .and. .not. useParticles) return
+  if (.not. useIBM) return
 
   ! Get stat size
   call parser_read('stat ibm bin size', nStatPoints, globalGridSize(1))
@@ -160,7 +160,7 @@ subroutine stat_el_ibm_write
        mean_granTemp, colfreqPartPart, colfreqPartIBM, colMomPartIBM
   
   ! Return if IBM is not used
-  if (.not. useIBM .and. .not. useParticles) return
+  if (.not. useIBM) return
     
   ! Compute mean stats
   meanRho = 0.0_WP
@@ -180,29 +180,32 @@ subroutine stat_el_ibm_write
     j = 1 + nint((coordinates(i,1) - xmin) / dx)
      ! Sum up grid volumes
      volume_ibm(j) = volume_ibm(j) + gridNorm(i,1)
-     volume_lpt(j) = volume_lpt(j) + primitiveGridNorm(i,1) * (1.0_WP - volumeFraction(i,1))
      totalVolume(j) = totalVolume(j) + primitiveGridNorm(i,1)
+     if (useParticles) then
+        volume_lpt(j) = volume_lpt(j) + primitiveGridNorm(i,1) * (1.0_WP - volumeFraction(i,1))
+        meanVelocity_part(j,1:nDimensions) = meanVelocity_part(j,1:nDimensions) +            &
+          primitiveGridNorm(i,1) * particleVelocity(i,1:nDimensions) *                       &
+          (1.0_WP - volumeFraction(i,1))
+        ! Collision frequency and granular temperature
+        mean_granTemp(j) = mean_granTemp(j) + granularTemperature(i,1) *                        &
+             primitiveGridNorm(i,1) * (1.0_WP - volumeFraction(i,1) )
+        colfreqPartPart(j) = colfreqPartPart(j) + collisionFrequency(i,1) *                     &
+             primitiveGridNorm(i,1) * (1.0_WP - volumeFraction(i,1) )
+        colfreqPartIBM(j) = colfreqPartIBM(j) + collisionFrequencyPartIBM(i,1) *                &
+             primitiveGridNorm(i,1) * (1.0_WP - volumeFraction(i,1) )
+        colMomPartIBM(j) = colMomPartIBM(j) + collisionMomentum(i,1) *                          &
+             primitiveGridNorm(i,1) * (1.0_WP - volumeFraction(i,1) )
+     end if
      ! Mean stats
      meanRho(j) = meanRho(j) + gridNorm(i,1) * conservedVariables(i,1)                     
      meanVelocity(j,1:nDimensions) = meanVelocity(j,1:nDimensions) +                         &
           gridNorm(i,1) * velocity(i,1:nDimensions)
      favreVelocity(j,1:nDimensions) = favreVelocity(j,1:nDimensions) +                       &
           gridNorm(i,1) * conservedVariables(i,2:nDimensions+1)
-     meanVelocity_part(j,1:nDimensions) = meanVelocity_part(j,1:nDimensions) +               &
-          primitiveGridNorm(i,1) * particleVelocity(i,1:nDimensions) *                       &
-          (1.0_WP - volumeFraction(i,1))
      meanVelocity_ibm(j,1:nDimensions) =  meanVelocity_ibm(j,1:nDimensions) +                &
           primitiveGridNorm(i,1) * (1.0_WP - indicatorFunction(i,1)) *                       &
           ibmVelocity(i,1:nDimensions)
-     ! Collision frequency and granular temperature
-     mean_granTemp(j) = mean_granTemp(j) + granularTemperature(i,1) *                        &
-          primitiveGridNorm(i,1) * (1.0_WP - volumeFraction(i,1) )
-     colfreqPartPart(j) = colfreqPartPart(j) + collisionFrequency(i,1) *                     &
-          primitiveGridNorm(i,1) * (1.0_WP - volumeFraction(i,1) )
-     colfreqPartIBM(j) = colfreqPartIBM(j) + collisionFrequencyPartIBM(i,1) *                &
-          primitiveGridNorm(i,1) * (1.0_WP - volumeFraction(i,1) )
-     colMomPartIBM(j) = colMomPartIBM(j) + collisionMomentum(i,1) *                          &
-          primitiveGridNorm(i,1) * (1.0_WP - volumeFraction(i,1) )
+     
   end do
   
   ! Sum them over procs
@@ -224,17 +227,17 @@ subroutine stat_el_ibm_write
   ! Normalize
   do i = 1, nStatPoints
      alpha_ibm(i) = 1.0_WP - (volume_ibm(i) / totalVolume(i))            
-     alpha_lpt(i) = volume_lpt(i) / totalVolume(i)            
      meanRho(i) = meanRho(i) / volume_ibm(i)
      meanVelocity(i,:) = meanVelocity(i,:) / volume_ibm(i)
      favreVelocity(i,:) = favreVelocity(i,:) / volume_ibm(i) / meanRho(i)
      meanVelocity_ibm(i,:) = meanVelocity_ibm(i,:) / volume_ibm(i) 
-     if (volume_lpt(i) .gt. 0.0_WP) then 
-          mean_granTemp(i) = mean_granTemp(i)/volume_lpt(i)
-          colfreqPartPart(i) = colfreqPartPart(i)/volume_lpt(i) 
-          colfreqPartIBM(i) = colfreqPartIBM(i)/volume_lpt(i)
-          colMomPartIBM(i) = colMomPartIBM(i)/volume_lpt(i)
-          meanVelocity_part(i,:) = meanVelocity_part(i,:) / volume_lpt(i) 
+     if (volume_lpt(i) .gt. 0.0_WP) then
+        alpha_lpt(i) = volume_lpt(i) / totalVolume(i)            
+        mean_granTemp(i) = mean_granTemp(i)/volume_lpt(i)
+        colfreqPartPart(i) = colfreqPartPart(i)/volume_lpt(i) 
+        colfreqPartIBM(i) = colfreqPartIBM(i)/volume_lpt(i)
+        colMomPartIBM(i) = colMomPartIBM(i)/volume_lpt(i)
+        meanVelocity_part(i,:) = meanVelocity_part(i,:) / volume_lpt(i) 
      end if
   end do
 
