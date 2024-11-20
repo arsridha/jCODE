@@ -909,14 +909,14 @@ subroutine ibm_ghost_point_correct_state(stateVector)
         end if
         
         ! Pressure treatment
-        if (ibm_move) then
-           n = objectIndex(i)
-           Pg = P_IP / (1.0_WP - 2.0_WP * abs(levelset(i, 1)) * ratioOfSpecificHeats /       &
-                (ratioOfSpecificHeats - 1.0_WP) * sum(object(n)%dudt(1:nDimensions) *        &
-                levelsetNormal(i,1:nDimensions)) / Tg)
-        else
+        !if (ibm_move) then
+        !   n = objectIndex(i)
+        !   Pg = P_IP / (1.0_WP - 2.0_WP * abs(levelset(i, 1)) * ratioOfSpecificHeats /       &
+        !        (ratioOfSpecificHeats - 1.0_WP) * sum(object(n)%dudt(1:nDimensions) *        &
+        !        levelsetNormal(i,1:nDimensions)) / Tg)
+        !else
            Pg = P_IP
-        end if
+        !end if
      end if
 
      ! Use ideal gas law to get density at the ghost point
