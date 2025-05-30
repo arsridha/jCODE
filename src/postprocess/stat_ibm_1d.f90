@@ -204,10 +204,11 @@ subroutine stat_ibm_1d_write
   character(len=str_medium) :: filename
   integer  :: i, j, n, iunit, ierror
   real(WP) :: D, F(3), pPrime
+  real(WP) :: stateVector(nGridPoints, nUnknowns)
   real(WP), dimension(nDimensions) :: uDoublePrime, objectVelocity
   real(WP), dimension(nDimensions**2) :: sigmaPrime
   !real(WP), dimension(nStatPoints, nDimensions) :: meanVelocity, favreVelocity
-  real(WP), dimension(nStatPoints, 3) :: meanVelocity, favreVelocity
+  real(WP), dimension(nStatPoints, 3) :: meanVelocity, favreVelocity, meanVelocityprime
   real(WP), dimension(nStatPoints, nDimensions**2) :: meanSigma, avgFlux
   real(WP), dimension(nStatPoints) :: meanRho, meanUU, meanVV, meanWW, meanUV, meanUW,       &
        meanVW, alpha, volume, totalVolume, meanP, dragP, dragV, meanUprime, pDivU, sigmaDivU,&
@@ -215,6 +216,9 @@ subroutine stat_ibm_1d_write
        udPIdx, uprime_dpdx, avgdsigmaUdx, convectiveterm, avgrhoUUU, dragP_II, x_pdivU,      &
        dragP_III, rhs_term_avg, numericalDissipation, avginviscFlux, avgviscFlux, mean_sound,&
        mean_Viscosity, meanT, forceP, forceV, pprimeUprime
+  real(WP), dimension(nStatPoints, nSpecies) :: uYprime, vYprime, wYprime, meanYprime,       &
+       meanYScalar,  meanYprimeYprime
+  real(WP), dimension(nSpecies) :: Yprime
   logical :: procHasObject
   real(WP), dimension(nGridPoints, nUnknowns) :: rhs_terms, dissipationSource
   real(WP), dimension(nGridPoints,nDimensions) :: gradI, gradP, ptimesI, Utilde, dpUdx, pU,  &
@@ -317,6 +321,7 @@ subroutine stat_ibm_1d_write
   meanRho = 0.0_WP
   meanVelocity = 0.0_WP
   favreVelocity = 0.0_WP
+  meanYScalar=0.0_WP
   totalVolume = 0.0_WP
   volume = 0.0_WP
   meanSigma = 0.0_WP
@@ -347,6 +352,13 @@ subroutine stat_ibm_1d_write
      mean_sound(j) = mean_sound(j) + gridNorm(i,1) * sqrt(ratioOfSpecificHeats *             &
           specificVolume(i,1) * pressure(i,1))
      mean_Viscosity(j)  = mean_Viscosity(j) + gridNorm(i,1) * dynamicViscosity(i,1)
+
+     ! Mean scalar 
+     if (nSpecies .gt. 0) then
+        meanYScalar(j,1:nSpecies)  = meanYScalar(j,1:nSpecies) + gridNorm(i,1) *                &
+             conservedVariables(i, nDimensions+3:nDimensions+2+nSpecies)
+     end if
+     
   end do
   
   ! Sum them over procs
@@ -363,6 +375,11 @@ subroutine stat_ibm_1d_write
      call parallel_sum(meanVelocity(:,i))
      call parallel_sum(favreVelocity(:,i))
   end do
+  if (nSpecies .gt. 0) then 
+     do i=1,nSpecies
+        call parallel_sum(meanYScalar(:,i))
+     end do
+  end if
   do i = 1, nDimensions**2
      call parallel_sum(meanSigma(:,i))
   end do
@@ -376,6 +393,7 @@ subroutine stat_ibm_1d_write
      mean_gradV(i) = mean_gradV(i) / totalVolume(i)
      meanVelocity(i,:) = meanVelocity(i,:) / volume(i)
      favreVelocity(i,:) = favreVelocity(i,:) / volume(i) / meanRho(i)
+     if (nSpecies .gt. 0) meanYScalar(i,:) = meanYScalar(i,:) / volume(i) / meanRho(i)
      meanSigma(i,:) = meanSigma(i,:) / totalvolume(i)
      mean_sound(i) = mean_sound(i) / volume(i)
      mean_Viscosity(i) = mean_Viscosity(i)/ volume(i)
@@ -388,7 +406,9 @@ subroutine stat_ibm_1d_write
   ! Compute variance
   meanUU = 0.0_WP; meanVV = 0.0_WP; meanWW = 0.0_WP
   meanUV = 0.0_WP; meanUW = 0.0_WP; meanVW = 0.0_WP
-  meanUprime = 0.0_WP             
+  meanVelocityPrime = 0.0_WP
+  meanYprime = 0.0_WP; uYprime = 0.0_WP; vYprime = 0.0_WP; wYprime = 0.0_WP
+  meanYprimeYprime = 0.0_WP             
   meanUPrime = 0.0_WP; sigmaDivU = 0.0_WP
   pDivU = 0.0_WP
   dragP = 0.0_WP; dragV = 0.0_WP
@@ -425,10 +445,23 @@ subroutine stat_ibm_1d_write
      
      ! Reynolds stresses
      meanUU(j) = meanUU(j) + gridNorm(i,1) * conservedVariables(i,1) * uDoublePrime(1)**2
+     ! Scalar variance
+     if (nSpecies .gt. 0) then
+        Yprime(1:nSpecies) = conservedVariables(i, nDimensions+3:nDimensions+2+nSpecies) /   &
+        conservedVariables(i,1)  - meanYScalar(j,1:nSpecies)
+        meanYprime(j,1:nSpecies) = meanYprime(j,1:nSpecies) + gridNorm(i,1) *                &
+             Yprime(1:nSpecies)  
+        meanYprimeYprime(j,1:nSpecies) = meanYprimeYprime(j,1:nSpecies) + gridNorm(i,1) *    &
+             Yprime(1:nSpecies)**2 
+        uYprime(j,1:nSpecies) = uYprime(j,1:nSpecies) + gridNorm(i,1) *  uDoublePrime(1) *   &
+             Yprime(1:nSpecies)
+     end if
      if (nDimensions .gt. 1) then
         meanVV(j) = meanVV(j) + gridNorm(i,1) * conservedVariables(i,1) * uDoublePrime(2)**2
         meanUV(j) = meanUV(j) + gridNorm(i,1) * conservedVariables(i,1) * uDoublePrime(1) *  &
              uDoublePrime(2)
+        if (nSpecies .gt. 0) vYprime(j,1:nSpecies) = vYprime(j,1:nSpecies) + gridNorm(i,1) * &
+             uDoublePrime(2) * Yprime(1:nSpecies) 
      end if
      if (nDimensions .gt. 2) then
         meanWW(j) = meanWW(j) + gridNorm(i,1) * conservedVariables(i,1) * uDoublePrime(3)**2
@@ -436,7 +469,11 @@ subroutine stat_ibm_1d_write
              uDoublePrime(3)
         meanVW(j) = meanVW(j) + gridNorm(i,1) * conservedVariables(i,1) * uDoublePrime(2) *  &
              uDoublePrime(3)
+        if (nSpecies .gt. 0) wYprime(j,1:nSpecies) = wYprime(j,1:nSpecies) + gridNorm(i,1) * &
+             uDoublePrime(3) * Yprime(1:nSpecies)
      end if
+     meanVelocityprime(j,1:nDimensions) = meanVelocityprime(j,1:nDimensions) + gridNorm(i,1)*&
+          conservedVariables(i,1) * uDoublePrime(1:nDimensions)
      rhs_term_avg(j) = rhs_term_avg(j) + gridNorm(i,1) * rhs_terms(i,2) * uDoublePrime(1)
      ! Dissipation
      numericalDissipation(j) = numericalDissipation(j) + gridNorm(i,1) * (sum(uDoublePrime * &
@@ -545,7 +582,8 @@ subroutine stat_ibm_1d_write
   call parallel_sum(meanUW); meanUW = meanUW / meanRho / volume
   call parallel_sum(meanVW); meanVW = meanVW / meanRho / volume
   call parallel_sum(meanUprime); meanUprime = meanUprime / volume
-
+  call parallel_sum(meanVelocityprime);  
+  
   call parallel_sum(pDivU); pDivU = pDivU / totalVolume                                                    
   call parallel_sum(sigmaDivU); sigmaDivU = sigmaDivU / totalVolume
   call parallel_sum(UdRhoUdt); UdRhoUdt = UdRhoUdt / totalVolume
@@ -570,13 +608,30 @@ subroutine stat_ibm_1d_write
   call gradient(dkdx, convective_term2)
   call gradient(rhoUUU, gradrhoUUU)
 
-  ! Normalise
+  if (nSpecies .gt. 0) then
+     do i=1, nSpecies
+        call parallel_sum(meanYprime(:,i))
+        call parallel_sum(meanYprimeYprime(:,i))
+        call parallel_sum(uYprime(:,i)) 
+        call parallel_sum(vYprime(:,i))
+        call parallel_sum(wYprime(:,i))
+     end do
+  end if
+! Normalise
   do i =1,nDimensions**2
      call parallel_sum(avgFlux(:,i))
   end do
   do i =1,nStatpoints
      avgFlux(i,:) = avgFlux(i,:) / totalvolume(i)
+     if (nSpecies .gt. 0) then
+        meanYprime(i,:) = meanYprime(i,:) / volume(i)
+        meanYprimeYprime(i,:) =  meanYprimeYprime(i,:) / volume(i) 
+        uYprime(i,:) = uYprime(i,:) / volume(i) 
+        vYprime(i,:) = vYprime(i,:) / volume(i) 
+        wYprime(i,:) = wYprime(i,:) / volume(i) 
+     end if
   end do
+  
   avgdpUdx = 0.0_WP
   avgdsigmaUdx = 0.0_WP
   convectiveterm = 0.0_WP
@@ -622,14 +677,14 @@ subroutine stat_ibm_1d_write
      iunit = iopen()
      open (iunit, file=adjustl(trim(filename)), form="formatted",iostat=ierror)
      write(iunit,'(A,1ES21.12)') "t=",time
-     write(iunit,'(50a21)') "X", "alpha", "Volume", "<U>", "<V>", "<W>", "<U'U'>", "<V'V'>", & 
+     write(iunit,'(59a21)') "X", "alpha", "Volume", "<U>", "<V>", "<W>", "<U'U'>", "<V'V'>", & 
            "<W'W'>", "<U'V'>", "<V'W'>", "<U'W'>", "dragP", "dragV", "<rho>", "<rhoUUU>",    &
            "pU", "uSigma", "pdivU", "sigmaDivU", "<P>", "<Sigma>", "<u''>", "Utilde",        &
            "Vtilde", "Wtilde", "dkdt", "flux_x", "flux_y", "<dP/dx>","dV/dx", "udrhoUdt",    &
            "uPrimeP", "uPrimesigma", "<dpUdx>", "uPdIdx", "uprime_dpdx", "VdrhoVdt",         &
            "avgdsigmaUdx", "convection", "avgrhoUUU", "dragP_II", "x_pDivU", "dragP_III",    &
            "rhs_term_avg", "Dissipation", "Sound", "Viscosity", "Temperature",      & ! forceP, forceV
-            "p'u''"
+            "p'u''", "<Y>","<U'>","<V'>", "<W'>", "<Y1'>","<Y1'Y1'>","<U'Y1'>","<V'Y1'>", "<W'Y1'>"
      do i = 1, nStatPoints
         write(iunit,'(10000ES21.12E3)') grid1D(i), alpha(i), totalVolume(i), meanVelocity(i,1),   &
              meanVelocity(i,2), meanVelocity(i,3), meanUU(i), meanVV(i), &
@@ -645,7 +700,9 @@ subroutine stat_ibm_1d_write
              VdrhoVdt(i), avgdsigmaUdx(i), convectiveterm(i), &
              avgrhoUUU(i), dragP_II(i), x_pDivU(i), dragP_III(i), &
              rhs_term_avg(i), numericalDissipation(i), mean_sound(i), mean_Viscosity(i),&
-             meanT(i), pprimeUprime(i) ! forceP(i), forceV(i), 
+             meanT(i), pprimeUprime(i), meanYScalar(i,1), meanVelocityprime(i,1), meanVelocityprime(i,2) ,     &
+             meanVelocityprime(i,3), meanYprime(i,1) , meanYprimeYprime(i,1), uYprime(i,1), vYprime(i,1),           &
+             wYprime(i,1) ! forceP(i), forceV(i),  ! Not generalized for now
      end do
      close(iclose(iunit))
      

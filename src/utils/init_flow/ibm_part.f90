@@ -329,16 +329,21 @@ subroutine ibm_part_data
 
   ! Local variables
   integer :: i, j, k
-  real(WP) :: gamma, x, x0, p1, p2, rho1, rho2, u1, u2, density, pressure, velocity
-  logical :: useShock
-
-  ! Set the number of conserved variables and allocate the array
-  nUnknowns = nDimensions + 2
-  allocate(conservedVariables(nGridPoints, nUnknowns))
+  real(WP) :: gamma, x, x0, p1, p2, rho1, rho2, u1, u2, density, pressure, velocity, scalar
+  logical :: useShock, useScalar
 
   ! Uniform flow or shock?
   call parser_read('include shock', useShock, .false.)
+  call parser_read('include scalar transport', useScalar, .false.)
 
+  ! Set the number of conserved variables and allocate the array
+  if (useScalar) then 
+     nUnknowns = nDimensions + 3
+  else
+     nUnknowns = nDimensions + 2
+  end if
+  allocate(conservedVariables(nGridPoints, nUnknowns))
+  
   ! Specific heat ratio
   call parser_read('ratio of specific heats', gamma, 1.4_WP)
 
@@ -372,10 +377,12 @@ subroutine ibm_part_data
                  density = rho1
                  pressure = p1
                  velocity = u1
+                 if (useScalar) scalar=1.0_WP
               else
                  density = rho2
                  pressure = p2
                  velocity = u2
+                 if (useScalar) scalar=0.0_WP
               end if
            end if
            
@@ -385,6 +392,8 @@ subroutine ibm_part_data
            conservedVariables(grid_index(i,j,k), 3:nDimensions+1) = 0.0_WP
            conservedVariables(grid_index(i,j,k), nDimensions+2) = pressure /                 &
                 (gamma - 1.0_WP) + 0.5_WP * density * velocity ** 2
+           if (useScalar) conservedVariables(grid_index(i,j,k), nDimensions+3) = density *   &
+                scalar
         end do
      end do
   end do
