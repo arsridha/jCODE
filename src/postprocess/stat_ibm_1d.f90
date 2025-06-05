@@ -450,18 +450,18 @@ subroutine stat_ibm_1d_write
         Yprime(1:nSpecies) = conservedVariables(i, nDimensions+3:nDimensions+2+nSpecies) /   &
         conservedVariables(i,1)  - meanYScalar(j,1:nSpecies)
         meanYprime(j,1:nSpecies) = meanYprime(j,1:nSpecies) + gridNorm(i,1) *                &
-             Yprime(1:nSpecies)  
+             Yprime(1:nSpecies) * conservedVariables(i,1) 
         meanYprimeYprime(j,1:nSpecies) = meanYprimeYprime(j,1:nSpecies) + gridNorm(i,1) *    &
-             Yprime(1:nSpecies)**2 
+             Yprime(1:nSpecies)**2 * conservedVariables(i,1) 
         uYprime(j,1:nSpecies) = uYprime(j,1:nSpecies) + gridNorm(i,1) *  uDoublePrime(1) *   &
-             Yprime(1:nSpecies)
+             Yprime(1:nSpecies) * conservedVariables(i,1)
      end if
      if (nDimensions .gt. 1) then
         meanVV(j) = meanVV(j) + gridNorm(i,1) * conservedVariables(i,1) * uDoublePrime(2)**2
         meanUV(j) = meanUV(j) + gridNorm(i,1) * conservedVariables(i,1) * uDoublePrime(1) *  &
              uDoublePrime(2)
         if (nSpecies .gt. 0) vYprime(j,1:nSpecies) = vYprime(j,1:nSpecies) + gridNorm(i,1) * &
-             uDoublePrime(2) * Yprime(1:nSpecies) 
+             uDoublePrime(2) * Yprime(1:nSpecies) * conservedVariables(i,1)
      end if
      if (nDimensions .gt. 2) then
         meanWW(j) = meanWW(j) + gridNorm(i,1) * conservedVariables(i,1) * uDoublePrime(3)**2
@@ -470,7 +470,7 @@ subroutine stat_ibm_1d_write
         meanVW(j) = meanVW(j) + gridNorm(i,1) * conservedVariables(i,1) * uDoublePrime(2) *  &
              uDoublePrime(3)
         if (nSpecies .gt. 0) wYprime(j,1:nSpecies) = wYprime(j,1:nSpecies) + gridNorm(i,1) * &
-             uDoublePrime(3) * Yprime(1:nSpecies)
+             uDoublePrime(3) * Yprime(1:nSpecies) * conservedVariables(i,1)
      end if
      meanVelocityprime(j,1:nDimensions) = meanVelocityprime(j,1:nDimensions) + gridNorm(i,1)*&
           conservedVariables(i,1) * uDoublePrime(1:nDimensions)
@@ -624,11 +624,11 @@ subroutine stat_ibm_1d_write
   do i =1,nStatpoints
      avgFlux(i,:) = avgFlux(i,:) / totalvolume(i)
      if (nSpecies .gt. 0) then
-        meanYprime(i,:) = meanYprime(i,:) / volume(i)
-        meanYprimeYprime(i,:) =  meanYprimeYprime(i,:) / volume(i) 
-        uYprime(i,:) = uYprime(i,:) / volume(i) 
-        vYprime(i,:) = vYprime(i,:) / volume(i) 
-        wYprime(i,:) = wYprime(i,:) / volume(i) 
+        meanYprime(i,:) = meanYprime(i,:) / volume(i) / meanRho(i)
+        meanYprimeYprime(i,:) =  meanYprimeYprime(i,:) / volume(i) / meanRho(i) 
+        uYprime(i,:) = uYprime(i,:) / volume(i) / meanRho(i)
+        vYprime(i,:) = vYprime(i,:) / volume(i) / meanRho(i)
+        wYprime(i,:) = wYprime(i,:) / volume(i) / meanRho(i)
      end if
   end do
   
